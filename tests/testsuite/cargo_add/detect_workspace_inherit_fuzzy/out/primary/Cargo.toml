@@ -4,4 +4,4 @@ version = "0.0.0"
 edition = "2015"
 
 [dependencies]
-fuzzy_dependency = "1.0.0"
+fuzzy_dependency.workspace = true

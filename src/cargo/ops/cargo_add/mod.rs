@@ -403,7 +403,26 @@ fn resolve_dependency(
     if dependency.source().is_none() {
         // Checking for a workspace dependency happens first since a member could be specified
         // in the workspace dependencies table as a dependency
-        if let Some(_dep) = find_workspace_dep(dependency.toml_key(), ws.root_manifest()).ok() {
+        let mut workspace_dep = find_workspace_dep(dependency.toml_key(), ws.root_manifest()).ok();
+        if workspace_dep.is_none() && dependency.rename.is_none() {
+            for name_permutation in [
+                dependency.name.replace('-', "_"),
+                dependency.name.replace('_', "-"),
+            ] {
+                workspace_dep = find_workspace_dep(&name_permutation, ws.root_manifest()).ok();
+                if let Some(workspace_dep) = &workspace_dep {
+                    if let Some(Source::Registry(_source)) = &workspace_dep.source {
+                        gctx.shell().warn(format!(
+                            "translating `{}` to `{}`",
+                            dependency.name, &name_permutation,
+                        ))?;
+                        dependency.name = name_permutation;
+                        break;
+                    }
+                }
+            }
+        }
+        if let Some(_dep) = workspace_dep {
             dependency = dependency.set_source(WorkspaceSource::new());
         } else if let Some(package) = ws.members().find(|p| p.name().as_str() == dependency.name) {
             // Only special-case workspaces when the user doesn't provide any extra
