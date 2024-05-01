@@ -364,7 +364,24 @@ fn resolve_dependency(
     };
     selected_dep = populate_dependency(selected_dep, arg);
 
-    let old_dep = get_existing_dependency(manifest, selected_dep.toml_key(), section)?;
+    let mut old_dep = get_existing_dependency(manifest, selected_dep.toml_key(), section)?;
+    if old_dep.is_none() && selected_dep.source().is_none() && selected_dep.rename().is_none() {
+        for name_permutation in [
+            selected_dep.name.replace('-', "_"),
+            selected_dep.name.replace('_', "-"),
+        ] {
+            old_dep = get_existing_dependency(manifest, &name_permutation, section)?;
+            if old_dep.is_some() {
+                gctx.shell().warn(format!(
+                    "translating `{}` to `{}`",
+                    selected_dep.name, &name_permutation,
+                ))?;
+                selected_dep.name = name_permutation;
+                break;
+            }
+        }
+    }
+
     let mut dependency = if let Some(mut old_dep) = old_dep.clone() {
         if old_dep.name != selected_dep.name {
             // Assuming most existing keys are not relevant when the package changes
